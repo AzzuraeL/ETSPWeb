@@ -1,58 +1,24 @@
-FROM php:8.3-fpm
+# Stage 1: Composer dependencies
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpq-dev \
-    libmariadb-dev \
-    zlib1g-dev \
-    libzip-dev \
-    unzip \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install \
-    pdo \
-    pdo_mysql \
-    zip \
-    && docker-php-ext-enable pdo pdo_mysql
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory
+# Stage 2: PHP runtime
+FROM php:8.3-cli
 WORKDIR /app
 
-# Copy application files
+# Install system dependencies
+RUN apt-get update && apt-get install -y unzip libpng-dev libjpeg-dev libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_mysql
+
+# Copy source + vendor
+COPY --from=vendor /app/vendor /app/vendor
 COPY . .
 
-# Make start script executable
-RUN chmod +x start.sh
+# Allow Railway to map the port dynamically
+EXPOSE 8000
 
-# Install dependencies
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
-RUN npm install
-RUN npm run build
-
-# Create cache directories and permissions
-RUN mkdir -p storage/framework/{sessions,views,cache,testing} storage/logs \
-    && chmod -R 777 storage bootstrap/cache
-
-# Run Laravel caching commands
-RUN php artisan config:cache \
-    && php artisan route:cache
-
-# Install Nginx
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
-
-# Copy Nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Expose port
-EXPOSE 80
-
-# Start Nginx and PHP-FPM with fallback port
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
-
+# Run Laravel server with environment variable expansion
+ENTRYPOINT [ "sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}" ]
