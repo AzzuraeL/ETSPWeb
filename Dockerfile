@@ -53,5 +53,5 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Expose port
 EXPOSE 80
 
-# Start Nginx and PHP-FPM
-CMD ["/bin/bash", "-c", "service php8.3-fpm start && nginx -g 'daemon off;'"]
+# Start Nginx and PHP-FPM with fallback port
+CMD ["/bin/bash", "-c", "PORT=${PORT:-8000} service php8.3-fpm start && nginx -g 'daemon off;'"]
