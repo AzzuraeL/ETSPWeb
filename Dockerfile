@@ -54,4 +54,5 @@ COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
 
 # Start Nginx and PHP-FPM with fallback port
-CMD ["/bin/bash", "-c", "PORT=${PORT:-8000} service php8.3-fpm start && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+
